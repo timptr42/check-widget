@@ -2,7 +2,7 @@ plugins {
     id "com.android.application"
 }
 
-def appBuildNumber = 2
+def appBuildNumber = 3
 
 android {
     namespace "ru.timptr.statuswidget"
@@ -11,7 +11,7 @@ android {
     defaultConfig {
         applicationId "ru.timptr.statuswidget"
         minSdk 29
-        targetSdk 35
+        targetSdk 32
         versionCode appBuildNumber
         versionName "1.0.${appBuildNumber}"
     }
@@ -20,6 +20,10 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+}
+
+dependencies {
+    implementation "com.getpebble:pebblekit:4.0.1"
 }
 
 androidComponents {

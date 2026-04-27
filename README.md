@@ -12,7 +12,9 @@ Android-приложение и home-screen виджеты для отображ
 - ручное обновление с экрана приложения и с кнопки виджета;
 - фоновое обновление примерно раз в минуту через `AlarmManager`;
 - кеш последнего успешного ответа, который показывается при ошибке сети;
-- отображение времени актуальности статусов и времени последней загрузки.
+- отображение времени актуальности статусов и времени последней загрузки;
+- Pebble companion: Android отправляет статусы на часы через PebbleKit AppMessage;
+- Pebble PBW watchface в консольном стиле.
 
 ## Сборка debug APK
 
@@ -23,10 +25,27 @@ export ANDROID_HOME="$HOME/android-sdk"
 
 Готовый APK появляется в:
 
-`app/build/outputs/apk/debug/app-debug.apk`
+`app/build/outputs/apk/debug/check-widget-debug-build-3.apk`
 
 Версия, добавленная в git:
 
-`dist/check-widget-debug-build-2.apk`
+`dist/check-widget-debug-build-3.apk`
 
 Package name: `ru.timptr.statuswidget`.
+
+## Pebble watchface
+
+UUID Android companion и PBW: `62391359-3e79-487e-b011-c5583372b08f`.
+
+Сборка PBW:
+
+```bash
+cd watchapp
+pebble build
+```
+
+Готовый PBW:
+
+`dist/timptr-check-watchface-build-3.pbw`
+
+Watchface показывает крупное время по центру, батарею часов цветом, `BT` цветом и центрированные статусы `[V]`, `[!]`, `[X]` в порядке Android/API.

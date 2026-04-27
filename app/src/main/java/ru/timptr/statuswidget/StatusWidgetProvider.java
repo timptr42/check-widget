@@ -60,6 +60,7 @@ public class StatusWidgetProvider extends AppWidgetProvider {
                         context.getString(R.string.refresh_failed));
             }
             updateAllWidgets(context, result);
+            PebbleCompanion.sendStatus(context, result);
             StatusScheduler.schedule(context);
         }, "status-widget-refresh");
         thread.start();

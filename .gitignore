@@ -1,6 +1,7 @@
 .gradle/
 /build/
 /app/build/
+/watchapp/build/
 local.properties
 *.iml
 .idea/

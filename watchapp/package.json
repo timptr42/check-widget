@@ -1,0 +1,32 @@
+{
+  "name": "timptr-check-watchface",
+  "author": "timptr42",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {},
+  "pebble": {
+    "displayName": "Timptr Check",
+    "uuid": "62391359-3e79-487e-b011-c5583372b08f",
+    "sdkVersion": "3",
+    "enableMultiJS": false,
+    "targetPlatforms": [
+      "aplite",
+      "basalt",
+      "chalk",
+      "diorite",
+      "emery"
+    ],
+    "watchapp": {
+      "watchface": true
+    },
+    "messageKeys": {
+      "statuses": 0,
+      "updated_at": 1,
+      "count": 2,
+      "request": 3
+    },
+    "resources": {
+      "media": []
+    }
+  }
+}

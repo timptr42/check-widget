@@ -37,6 +37,16 @@ final class StatusItem {
         return indicator == null || indicator.trim().isEmpty() ? "Индикатор" : indicator;
     }
 
+    char pebbleSymbol() {
+        if ("green".equalsIgnoreCase(status)) {
+            return 'V';
+        }
+        if ("yellow".equalsIgnoreCase(status)) {
+            return '!';
+        }
+        return 'X';
+    }
+
     Instant updatedInstant() {
         return parseInstant(updatedAt);
     }
