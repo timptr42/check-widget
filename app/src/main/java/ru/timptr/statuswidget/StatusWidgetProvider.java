@@ -9,11 +9,19 @@ import android.content.Intent;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.view.View;
 import android.widget.RemoteViews;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 public class StatusWidgetProvider extends AppWidgetProvider {
     public static final String ACTION_REFRESH = "ru.timptr.statuswidget.REFRESH";
+    private static final int COMPACT_VISIBLE_ROWS = 4;
+    private static final int DEFAULT_VISIBLE_ROWS = 8;
 
     @Override
     public void onUpdate(Context context, AppWidgetManager appWidgetManager, int[] appWidgetIds) {
@@ -87,22 +95,41 @@ public class StatusWidgetProvider extends AppWidgetProvider {
             return views;
         }
 
-        int limit = compact ? 3 : 8;
-        int count = Math.min(result.items.size(), limit);
-        for (int i = 0; i < count; i++) {
-            views.addView(R.id.widget_rows, rowViews(context, result.items.get(i), compact));
+        int limit = visibleRowLimit(context, widgetId, compact);
+        int usedRows = 0;
+        int hiddenRows = 0;
+        for (SourceGroup group : groupBySource(result.items)) {
+            if (usedRows >= limit) {
+                hiddenRows += group.items.size();
+                continue;
+            }
+
+            int rowsForGroup = Math.min(group.items.size(), limit - usedRows);
+            views.addView(R.id.widget_rows, cardViews(context, group, rowsForGroup, compact));
+            usedRows += rowsForGroup;
+            hiddenRows += group.items.size() - rowsForGroup;
         }
-        if (result.items.size() > count) {
-            addEmptyRow(context, views, context.getString(R.string.more_statuses, result.items.size() - count));
+        if (hiddenRows > 0 && usedRows < limit) {
+            addEmptyRow(context, views, context.getString(R.string.more_statuses, hiddenRows));
         }
         return views;
+    }
+
+    private static RemoteViews cardViews(Context context, SourceGroup group, int rowCount, boolean compact) {
+        RemoteViews card = new RemoteViews(context.getPackageName(), R.layout.widget_status_card);
+        card.setTextViewText(R.id.card_source, group.source);
+        card.removeAllViews(R.id.card_rows);
+        for (int i = 0; i < rowCount; i++) {
+            card.addView(R.id.card_rows, rowViews(context, group.items.get(i), compact));
+        }
+        return card;
     }
 
     private static RemoteViews rowViews(Context context, StatusItem item, boolean compact) {
         RemoteViews row = new RemoteViews(context.getPackageName(), R.layout.widget_status_row);
         row.setTextViewText(R.id.row_dot, "●");
         row.setTextColor(R.id.row_dot, statusColor(item.status));
-        row.setTextViewText(R.id.row_title, item.title());
+        row.setTextViewText(R.id.row_title, item.indicatorTitle());
         row.setTextViewText(R.id.row_time, compact
                 ? StatusRepository.formatIso(context, item.updatedAt)
                 : context.getString(R.string.row_status_time, item.status, StatusRepository.formatIso(context, item.updatedAt)));
@@ -115,6 +142,33 @@ public class StatusWidgetProvider extends AppWidgetProvider {
         row.setTextViewText(R.id.row_title, text);
         row.setTextViewText(R.id.row_time, "");
         views.addView(R.id.widget_rows, row);
+    }
+
+    private static int visibleRowLimit(Context context, int widgetId, boolean compact) {
+        AppWidgetManager manager = AppWidgetManager.getInstance(context);
+        Bundle options = manager.getAppWidgetOptions(widgetId);
+        int minHeight = options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0);
+        if (minHeight <= 0) {
+            return compact ? COMPACT_VISIBLE_ROWS : DEFAULT_VISIBLE_ROWS;
+        }
+
+        int reservedHeight = compact ? 34 : 58;
+        int rowHeight = 21;
+        return Math.max(1, (minHeight - reservedHeight) / rowHeight);
+    }
+
+    private static List<SourceGroup> groupBySource(List<StatusItem> items) {
+        Map<String, SourceGroup> groups = new LinkedHashMap<>();
+        for (StatusItem item : items) {
+            String source = item.sourceTitle();
+            SourceGroup group = groups.get(source);
+            if (group == null) {
+                group = new SourceGroup(source);
+                groups.put(source, group);
+            }
+            group.items.add(item);
+        }
+        return new ArrayList<>(groups.values());
     }
 
     private static String subtitle(Context context, StatusRepository.StatusResult result) {
@@ -157,5 +211,14 @@ public class StatusWidgetProvider extends AppWidgetProvider {
             flags |= PendingIntent.FLAG_IMMUTABLE;
         }
         return flags;
+    }
+
+    private static final class SourceGroup {
+        final String source;
+        final List<StatusItem> items = new ArrayList<>();
+
+        SourceGroup(String source) {
+            this.source = source;
+        }
     }
 }

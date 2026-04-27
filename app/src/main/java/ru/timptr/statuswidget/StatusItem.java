@@ -29,6 +29,14 @@ final class StatusItem {
         return source + " / " + (indicator == null ? "" : indicator);
     }
 
+    String sourceTitle() {
+        return source == null || source.trim().isEmpty() ? "Источник" : source;
+    }
+
+    String indicatorTitle() {
+        return indicator == null || indicator.trim().isEmpty() ? "Индикатор" : indicator;
+    }
+
     Instant updatedInstant() {
         return parseInstant(updatedAt);
     }

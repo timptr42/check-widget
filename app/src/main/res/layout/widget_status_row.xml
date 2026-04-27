@@ -4,35 +4,35 @@
     android:layout_height="wrap_content"
     android:gravity="center_vertical"
     android:orientation="horizontal"
-    android:paddingTop="2dp"
-    android:paddingBottom="2dp">
+    android:paddingTop="1dp"
+    android:paddingBottom="1dp">
 
     <TextView
         android:id="@+id/row_dot"
-        android:layout_width="18dp"
+        android:layout_width="10dp"
         android:layout_height="wrap_content"
         android:gravity="center"
         android:text="●"
-        android:textSize="14sp" />
+        android:textSize="9sp" />
 
     <TextView
         android:id="@+id/row_title"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="4dp"
+        android:layout_marginStart="2dp"
         android:layout_weight="1"
         android:ellipsize="end"
         android:maxLines="1"
         android:textColor="@color/text_primary"
-        android:textSize="12sp" />
+        android:textSize="10sp" />
 
     <TextView
         android:id="@+id/row_time"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="6dp"
+        android:layout_marginStart="3dp"
         android:ellipsize="end"
         android:maxLines="1"
         android:textColor="@color/text_secondary"
-        android:textSize="10sp" />
+        android:textSize="8sp" />
 </LinearLayout>
