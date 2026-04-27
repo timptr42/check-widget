@@ -25,11 +25,11 @@ export ANDROID_HOME="$HOME/android-sdk"
 
 Готовый APK появляется в:
 
-`app/build/outputs/apk/debug/check-widget-debug-build-4.apk`
+`app/build/outputs/apk/debug/check-widget-debug-build-5.apk`
 
 Версия, добавленная в git:
 
-`dist/check-widget-debug-build-4.apk`
+`dist/check-widget-debug-build-5.apk`
 
 Package name: `ru.timptr.statuswidget`.
 
@@ -46,9 +46,13 @@ pebble build
 
 Готовый PBW:
 
-`dist/timptr-check-watchface-build-4.pbw`
+`dist/timptr-check-watchface-build-5.pbw`
 
 Watchface показывает крупное время по центру, батарею часов цветом, `BT` цветом и центрированные статусы `[V]`, `[!]`, `[X]` в порядке Android/API.
+
+## Pebble connection
+
+Build 5 uses optimistic AppMessage delivery: Android still sends messages even if `PebbleKit.isWatchConnected()` returns false, because some Pebble/Rebble setups can install PBW while the old PebbleKit provider reports no connection. The phone screen shows the raw PebbleKit state, last send attempt, ACK/NACK, and last request from the watch.
 
 ## Алгоритм связи Pebble
 

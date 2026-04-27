@@ -25,6 +25,7 @@ final class PebbleCompanion {
     private static final String KEY_LAST_TRANSACTION_ID = "last_transaction_id";
     private static final String KEY_LAST_MESSAGE = "last_message";
     private static final String KEY_NEXT_TRANSACTION_ID = "next_transaction_id";
+    private static boolean liveHandlersRegistered;
 
     private PebbleCompanion() {
     }
@@ -69,7 +70,7 @@ final class PebbleCompanion {
         StringBuilder builder = new StringBuilder();
         builder.append("Pebble: ");
         if (!state.connected) {
-            builder.append("не подключены");
+            builder.append("не подтверждены PebbleKit");
         } else if (!state.appMessagesSupported) {
             builder.append("подключены, AppMessage недоступен");
         } else {
@@ -100,11 +101,6 @@ final class PebbleCompanion {
         return builder.toString();
     }
 
-    static boolean isReady(Context context) {
-        PebbleState state = getState(context);
-        return state.connected && state.appMessagesSupported;
-    }
-
     static void startWatchface(Context context) {
         try {
             PebbleKit.startAppOnPebble(context.getApplicationContext(), PEBBLE_APP_UUID);
@@ -112,6 +108,28 @@ final class PebbleCompanion {
         } catch (RuntimeException exception) {
             saveMessage(context, "Ошибка запуска Pebble: " + safeMessage(exception));
         }
+    }
+
+    static void registerRuntimeReceivers(Context context) {
+        if (liveHandlersRegistered || context == null) {
+            return;
+        }
+        Context appContext = context.getApplicationContext();
+        try {
+            PebbleKit.registerReceivedDataHandler(appContext, new PebbleDataReceiver());
+            PebbleKit.registerReceivedAckHandler(appContext, new PebbleAckReceiver());
+            PebbleKit.registerReceivedNackHandler(appContext, new PebbleNackReceiver());
+            PebbleKit.registerPebbleConnectedReceiver(appContext, new PebbleConnectionReceiver());
+            PebbleKit.registerPebbleDisconnectedReceiver(appContext, new PebbleConnectionReceiver());
+            liveHandlersRegistered = true;
+            saveMessage(appContext, "Pebble runtime receivers активны");
+        } catch (RuntimeException exception) {
+            saveMessage(appContext, "Ошибка runtime receivers: " + safeMessage(exception));
+        }
+    }
+
+    static void markManualAttempt(Context context) {
+        saveMessage(context, "Ручная отправка Pebble запрошена");
     }
 
     static void recordRequest(Context context) {
@@ -169,14 +187,6 @@ final class PebbleCompanion {
 
         Context appContext = context.getApplicationContext();
         PebbleState state = getState(appContext);
-        if (!state.connected) {
-            saveMessage(appContext, "Pebble не подключены");
-            return SendResult.error("Pebble не подключены");
-        }
-        if (!state.appMessagesSupported) {
-            saveMessage(appContext, "Pebble AppMessage недоступен");
-            return SendResult.error("AppMessage недоступен");
-        }
 
         String statusLine = buildStatusLine(result);
         long now = System.currentTimeMillis();
@@ -197,7 +207,9 @@ final class PebbleCompanion {
                     .putString(KEY_LAST_LINE, statusLine)
                     .putLong(KEY_LAST_ATTEMPT_AT, now)
                     .putInt(KEY_LAST_TRANSACTION_ID, transactionId)
-                    .putString(KEY_LAST_MESSAGE, "Отправлено на Pebble #" + transactionId)
+                    .putString(KEY_LAST_MESSAGE, state.connected
+                            ? "Отправлено на Pebble #" + transactionId
+                            : "Отправлено без подтверждения PebbleKit #" + transactionId)
                     .apply();
             notifyStateChanged(appContext);
             return SendResult.sent(transactionId);

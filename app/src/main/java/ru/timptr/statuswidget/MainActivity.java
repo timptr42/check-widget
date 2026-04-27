@@ -52,6 +52,7 @@ public class MainActivity extends Activity {
         refreshButton.setOnClickListener(view -> refresh());
         pebbleButton.setOnClickListener(view -> pushPebbleNow());
         StatusScheduler.schedule(this);
+        PebbleCompanion.registerRuntimeReceivers(this);
         render(StatusRepository.getCached(this));
         updatePebbleStatus();
         refresh();
@@ -156,12 +157,9 @@ public class MainActivity extends Activity {
     private void updatePebbleStatus() {
         PebbleCompanion.PebbleState state = PebbleCompanion.getState(this);
         pebbleStatus.setText(PebbleCompanion.statusText(this));
-        int color = (state.connected && state.appMessagesSupported)
+        int color = state.lastAckAt > 0L
                 ? getColor(R.color.green)
                 : getColor(R.color.text_secondary);
-        if (!state.connected) {
-            color = getColor(R.color.red);
-        }
         pebbleStatus.setTextColor(color);
     }
 
@@ -174,6 +172,7 @@ public class MainActivity extends Activity {
         } else {
             registerReceiver(pebbleStateReceiver, filter);
         }
+        PebbleCompanion.registerRuntimeReceivers(this);
         updatePebbleStatus();
     }
 
