@@ -25,11 +25,11 @@ export ANDROID_HOME="$HOME/android-sdk"
 
 Готовый APK появляется в:
 
-`app/build/outputs/apk/debug/check-widget-debug-build-3.apk`
+`app/build/outputs/apk/debug/check-widget-debug-build-4.apk`
 
 Версия, добавленная в git:
 
-`dist/check-widget-debug-build-3.apk`
+`dist/check-widget-debug-build-4.apk`
 
 Package name: `ru.timptr.statuswidget`.
 
@@ -46,6 +46,17 @@ pebble build
 
 Готовый PBW:
 
-`dist/timptr-check-watchface-build-3.pbw`
+`dist/timptr-check-watchface-build-4.pbw`
 
 Watchface показывает крупное время по центру, батарею часов цветом, `BT` цветом и центрированные статусы `[V]`, `[!]`, `[X]` в порядке Android/API.
+
+## Алгоритм связи Pebble
+
+1. Watchface при старте и при восстановлении BT отправляет AppMessage `request=refresh`.
+2. Android receiver подтверждает входящее сообщение через ACK и сразу отправляет кешированные статусы.
+3. Android параллельно обновляет API и пушит свежие статусы с новым transaction id.
+4. Android слушает `RECEIVE_ACK` / `RECEIVE_NACK` и показывает состояние на главном экране.
+5. Если часы подключились заново, Android запускает watchface и принудительно отправляет последние данные.
+6. Если watchface не получил данные, он повторяет запрос раз в 30 секунд и показывает `PHONE?`; без BT показывает `NO BT`.
+
+На главном экране Android есть блок Pebble со статусом подключения, последней отправкой, ACK, запросом часов и кнопкой `Pebble: открыть и отправить`.

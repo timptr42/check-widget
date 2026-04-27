@@ -30,4 +30,7 @@
     <string name="more_statuses">+%1$d ещё</string>
     <string name="row_status_time">%1$s - %2$s</string>
     <string name="more_cards">+%1$d инд.</string>
+    <string name="pebble_force_send">Pebble: открыть и отправить</string>
+    <string name="pebble_send">Pebble: открыть и отправить</string>
+    <string name="pebble_status_unknown">Pebble: проверка...</string>
 </resources>

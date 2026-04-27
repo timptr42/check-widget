@@ -4,6 +4,7 @@
 #define PERSIST_STATUS_LINE 1
 #define MAX_STATUS_CHARS 32
 #define MAX_STATUS_MARKERS 10
+#define REQUEST_RETRY_SECONDS 30
 
 static Window *s_window;
 static TextLayer *s_time_layer;
@@ -15,6 +16,10 @@ static char s_battery_text[8];
 static char s_status_line[MAX_STATUS_CHARS] = "";
 static BatteryChargeState s_battery_state;
 static bool s_bt_connected;
+static time_t s_last_request_at;
+static bool s_phone_pending;
+
+static void request_phone_update(void);
 
 static GColor color_for_status(char status) {
   if (status == 'V') {
@@ -56,6 +61,10 @@ static void update_bt(bool connected) {
 
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time();
+  if (s_bt_connected && strlen(s_status_line) == 0 &&
+      time(NULL) - s_last_request_at >= REQUEST_RETRY_SECONDS) {
+    request_phone_update();
+  }
 }
 
 static void battery_handler(BatteryChargeState state) {
@@ -64,6 +73,9 @@ static void battery_handler(BatteryChargeState state) {
 
 static void bt_handler(bool connected) {
   update_bt(connected);
+  if (connected) {
+    request_phone_update();
+  }
 }
 
 static void status_layer_update(Layer *layer, GContext *ctx) {
@@ -72,7 +84,9 @@ static void status_layer_update(Layer *layer, GContext *ctx) {
 
   int len = strlen(s_status_line);
   if (len == 0) {
-    graphics_draw_text(ctx, "WAIT", fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
+    const char *text = s_bt_connected ? (s_phone_pending ? "PHONE?" : "WAIT") : "NO BT";
+    graphics_context_set_text_color(ctx, s_bt_connected ? GColorYellow : GColorRed);
+    graphics_draw_text(ctx, text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
                        bounds, GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
     return;
   }
@@ -125,9 +139,25 @@ static void inbox_received(DictionaryIterator *iter, void *context) {
   if (statuses && statuses->type == TUPLE_CSTRING) {
     strncpy(s_status_line, statuses->value->cstring, sizeof(s_status_line) - 1);
     s_status_line[sizeof(s_status_line) - 1] = '\0';
+    s_phone_pending = false;
     persist_write_string(PERSIST_STATUS_LINE, s_status_line);
     layer_mark_dirty(s_status_layer);
   }
+}
+
+static void inbox_dropped(AppMessageResult reason, void *context) {
+  s_phone_pending = true;
+  layer_mark_dirty(s_status_layer);
+}
+
+static void outbox_sent(DictionaryIterator *iter, void *context) {
+  s_phone_pending = true;
+  layer_mark_dirty(s_status_layer);
+}
+
+static void outbox_failed(DictionaryIterator *iter, AppMessageResult reason, void *context) {
+  s_phone_pending = false;
+  layer_mark_dirty(s_status_layer);
 }
 
 static void request_phone_update(void) {
@@ -137,7 +167,10 @@ static void request_phone_update(void) {
     return;
   }
   dict_write_cstring(out, MESSAGE_KEY_request, "refresh");
+  s_last_request_at = time(NULL);
+  s_phone_pending = true;
   app_message_outbox_send();
+  layer_mark_dirty(s_status_layer);
 }
 
 static TextLayer *create_text_layer(GRect frame, GFont font, GTextAlignment alignment) {
@@ -198,6 +231,9 @@ static void init(void) {
   });
 
   app_message_register_inbox_received(inbox_received);
+  app_message_register_inbox_dropped(inbox_dropped);
+  app_message_register_outbox_sent(outbox_sent);
+  app_message_register_outbox_failed(outbox_failed);
   app_message_open(256, 64);
 
   tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);

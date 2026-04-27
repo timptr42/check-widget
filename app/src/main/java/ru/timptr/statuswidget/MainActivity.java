@@ -3,6 +3,10 @@ package ru.timptr.statuswidget;
 import android.app.Activity;
 import android.appwidget.AppWidgetManager;
 import android.content.ComponentName;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -21,8 +25,16 @@ public class MainActivity extends Activity {
     private LinearLayout list;
     private TextView summary;
     private TextView error;
+    private TextView pebbleStatus;
     private ProgressBar progress;
     private Button refreshButton;
+    private Button pebbleButton;
+    private final BroadcastReceiver pebbleStateReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            updatePebbleStatus();
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,12 +44,16 @@ public class MainActivity extends Activity {
         list = findViewById(R.id.status_list);
         summary = findViewById(R.id.summary_text);
         error = findViewById(R.id.error_text);
+        pebbleStatus = findViewById(R.id.pebble_status_text);
         progress = findViewById(R.id.progress);
         refreshButton = findViewById(R.id.refresh_button);
+        pebbleButton = findViewById(R.id.pebble_button);
 
         refreshButton.setOnClickListener(view -> refresh());
+        pebbleButton.setOnClickListener(view -> pushPebbleNow());
         StatusScheduler.schedule(this);
         render(StatusRepository.getCached(this));
+        updatePebbleStatus();
         refresh();
     }
 
@@ -67,8 +83,21 @@ public class MainActivity extends Activity {
                     error.setVisibility(View.VISIBLE);
                 }
                 updateWidgets();
+                PebbleCompanion.forceSendStatus(this, finalResult);
+                updatePebbleStatus();
             });
         });
+    }
+
+    private void pushPebbleNow() {
+        PebbleCompanion.startWatchface(this);
+        StatusRepository.StatusResult cached = StatusRepository.getCached(this);
+        if (cached.hasData()) {
+            PebbleCompanion.forceSendStatus(this, cached);
+            updatePebbleStatus();
+            return;
+        }
+        refresh();
     }
 
     private void setLoading(boolean loading) {
@@ -122,6 +151,36 @@ public class MainActivity extends Activity {
     private void updateWidgets() {
         AppWidgetManager manager = AppWidgetManager.getInstance(this);
         StatusWidgetProvider.updateAllWidgets(this, StatusRepository.getCached(this));
+    }
+
+    private void updatePebbleStatus() {
+        PebbleCompanion.PebbleState state = PebbleCompanion.getState(this);
+        pebbleStatus.setText(PebbleCompanion.statusText(this));
+        int color = (state.connected && state.appMessagesSupported)
+                ? getColor(R.color.green)
+                : getColor(R.color.text_secondary);
+        if (!state.connected) {
+            color = getColor(R.color.red);
+        }
+        pebbleStatus.setTextColor(color);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        IntentFilter filter = new IntentFilter(PebbleCompanion.ACTION_STATE_CHANGED);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(pebbleStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(pebbleStateReceiver, filter);
+        }
+        updatePebbleStatus();
+    }
+
+    @Override
+    protected void onPause() {
+        unregisterReceiver(pebbleStateReceiver);
+        super.onPause();
     }
 
     @Override

@@ -2,7 +2,7 @@ plugins {
     id "com.android.application"
 }
 
-def appBuildNumber = 3
+def appBuildNumber = 4
 
 android {
     namespace "ru.timptr.statuswidget"
