@@ -2,6 +2,8 @@ plugins {
     id "com.android.application"
 }
 
+def appBuildNumber = 2
+
 android {
     namespace "ru.timptr.statuswidget"
     compileSdk 35
@@ -10,12 +12,20 @@ android {
         applicationId "ru.timptr.statuswidget"
         minSdk 29
         targetSdk 35
-        versionCode 1
-        versionName "1.0"
+        versionCode appBuildNumber
+        versionName "1.0.${appBuildNumber}"
     }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+androidComponents {
+    onVariants(selector().withBuildType("debug")) { variant ->
+        variant.outputs.forEach { output ->
+            output.outputFileName.set("check-widget-debug-build-${appBuildNumber}.apk")
+        }
     }
 }
