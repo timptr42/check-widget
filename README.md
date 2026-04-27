@@ -25,4 +25,8 @@ export ANDROID_HOME="$HOME/android-sdk"
 
 `app/build/outputs/apk/debug/app-debug.apk`
 
+Версия, добавленная в git:
+
+`dist/check-widget-debug.apk`
+
 Package name: `ru.timptr.statuswidget`.
