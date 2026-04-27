@@ -17,6 +17,7 @@
     <string name="status_summary">Статусов: %1$d. %2$s: %3$s</string>
     <string name="status_details">Статус: %1$s. Актуально: %2$s</string>
     <string name="refresh_error">Не удалось обновить: %1$s</string>
+    <string name="cache_hint">Последние успешные данные сохраняются и показываются при ошибке сети.</string>
     <string name="tap_to_open">Нажмите, чтобы открыть приложение</string>
     <string name="cache_prefix">Кэш</string>
     <string name="updated_prefix">Обновлено</string>

@@ -8,4 +8,11 @@
     <color name="red">#E84D4F</color>
     <color name="unknown">#9AA4B2</color>
     <color name="accent">#2563EB</color>
+    <color name="blue">#2563EB</color>
+    <color name="status_green">#20B26B</color>
+    <color name="status_yellow">#F5B942</color>
+    <color name="status_red">#E84D4F</color>
+    <color name="status_unknown">#9AA4B2</color>
+    <color name="widget_background">#FFFFFF</color>
+    <color name="widget_border">#D7DEE8</color>
 </resources>
