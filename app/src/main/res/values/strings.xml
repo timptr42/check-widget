@@ -1,0 +1,31 @@
+<resources>
+    <string name="app_name">Timptr Status Widget</string>
+    <string name="app_name_short">Timptr Check</string>
+    <string name="widget_name">Timptr Statuses</string>
+    <string name="widget_compact_name">Timptr Status Compact</string>
+    <string name="widget_description">Shows current Timptr indicator statuses.</string>
+    <string name="widget_compact_description">Shows a compact Timptr status summary.</string>
+    <string name="refresh">Обновить</string>
+    <string name="refresh_short">R</string>
+    <string name="loading_statuses">Загрузка статусов...</string>
+    <string name="no_statuses">Нет статусов</string>
+    <string name="no_cached_data">Нет загруженных данных</string>
+    <string name="cache_error">Ошибка чтения кеша</string>
+    <string name="refresh_failed">Ошибка обновления</string>
+    <string name="refresh_error_short">Ошибка: %1$s</string>
+    <string name="status_endpoint">https://check.timptr.ru/api/statuses/current</string>
+    <string name="status_summary">Статусов: %1$d. %2$s: %3$s</string>
+    <string name="status_details">Статус: %1$s. Актуально: %2$s</string>
+    <string name="refresh_error">Не удалось обновить: %1$s</string>
+    <string name="tap_to_open">Нажмите, чтобы открыть приложение</string>
+    <string name="cache_prefix">Кэш</string>
+    <string name="updated_prefix">Обновлено</string>
+    <string name="cached">Кэш</string>
+    <string name="updated">Обновлено</string>
+    <string name="cached_at">Кэш:</string>
+    <string name="loaded_at">Обновлено:</string>
+    <string name="never">никогда</string>
+    <string name="not_loaded_yet">Ещё не загружено</string>
+    <string name="more_statuses">+%1$d ещё</string>
+    <string name="row_status_time">%1$s - %2$s</string>
+</resources>

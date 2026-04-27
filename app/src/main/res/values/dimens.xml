@@ -1,0 +1,4 @@
+<resources>
+    <dimen name="status_dot_size">14dp</dimen>
+    <dimen name="widget_dot_size">10dp</dimen>
+</resources>
