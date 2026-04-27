@@ -16,6 +16,7 @@ final class PebbleCompanion {
     private static final int KEY_UPDATED_AT = 1;
     private static final int KEY_STATUS_COUNT = 2;
     private static final int KEY_REQUEST = 3;
+    private static final int KEY_LABELS = 4;
     private static final int MIN_SEND_INTERVAL_MS = 15_000;
     private static final String PREFS = "pebble_state";
     private static final String KEY_LAST_LINE = "last_line";
@@ -180,7 +181,7 @@ final class PebbleCompanion {
         if (context == null) {
             return SendResult.error("Нет context");
         }
-        if (result == null || !result.hasData()) {
+        if (result == null || (!result.hasData() && result.fetchedAt <= 0L)) {
             saveMessage(context, "Нет данных для отправки на Pebble");
             return SendResult.error("Нет данных");
         }
@@ -199,6 +200,7 @@ final class PebbleCompanion {
         dict.addString(KEY_STATUS_LINE, statusLine);
         dict.addInt32(KEY_UPDATED_AT, (int) (result.fetchedAt / 1000L));
         dict.addInt32(KEY_STATUS_COUNT, result.items.size());
+        dict.addString(KEY_LABELS, buildLabelLine(result));
 
         try {
             PebbleKit.sendDataToPebbleWithTransactionId(appContext, PEBBLE_APP_UUID, dict, transactionId);
@@ -233,6 +235,27 @@ final class PebbleCompanion {
             builder.append(item.pebbleSymbol());
         }
         return builder.toString();
+    }
+
+    private static String buildLabelLine(StatusRepository.StatusResult result) {
+        StringBuilder builder = new StringBuilder();
+        for (int i = 0; i < result.items.size(); i++) {
+            if (i > 0) {
+                builder.append('|');
+            }
+            StatusItem item = result.items.get(i);
+            builder.append(cleanLabelPart(item.sourceTitle()))
+                    .append(" - ")
+                    .append(cleanLabelPart(item.indicatorTitle()));
+        }
+        return builder.toString();
+    }
+
+    private static String cleanLabelPart(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace('|', '/').trim();
     }
 
     private static String formatMarkers(String line) {

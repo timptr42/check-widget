@@ -23,7 +23,8 @@
       "statuses": 0,
       "updated_at": 1,
       "count": 2,
-      "request": 3
+      "request": 3,
+      "labels": 4
     },
     "resources": {
       "media": []

@@ -2,9 +2,13 @@
 #include "message_keys.auto.h"
 
 #define PERSIST_STATUS_LINE 1
+#define PERSIST_LABELS 2
+#define PERSIST_HAS_PAYLOAD 3
 #define MAX_STATUS_CHARS 32
-#define MAX_STATUS_MARKERS 10
+#define MAX_LABELS_CHARS 512
+#define MAX_LABEL_CHARS 40
 #define REQUEST_RETRY_SECONDS 30
+#define MESSAGE_KEY_labels 4
 
 static Window *s_window;
 static TextLayer *s_time_layer;
@@ -14,10 +18,22 @@ static Layer *s_status_layer;
 static char s_time_text[8];
 static char s_battery_text[8];
 static char s_status_line[MAX_STATUS_CHARS] = "";
-static BatteryChargeState s_battery_state;
+static char s_labels[MAX_LABELS_CHARS] = "";
 static bool s_bt_connected;
 static time_t s_last_request_at;
 static bool s_phone_pending;
+static bool s_has_payload;
+static int s_selected_index;
+static GPath *s_arrow_path;
+static const GPoint ARROW_POINTS[] = {
+    {0, 0},
+    {-7, 10},
+    {7, 10}
+};
+static const GPathInfo ARROW_PATH_INFO = {
+    .num_points = 3,
+    .points = (GPoint *)ARROW_POINTS
+};
 
 static void request_phone_update(void);
 
@@ -41,13 +57,18 @@ static GColor color_for_battery(int percent) {
   return GColorGreen;
 }
 
+static int status_count(void) {
+  return strlen(s_status_line);
+}
+
 static void update_time(void) {
-  clock_copy_time_string(s_time_text, sizeof(s_time_text));
+  time_t now = time(NULL);
+  struct tm *tick_time = localtime(&now);
+  strftime(s_time_text, sizeof(s_time_text), "%H %M", tick_time);
   text_layer_set_text(s_time_layer, s_time_text);
 }
 
 static void update_battery(BatteryChargeState state) {
-  s_battery_state = state;
   snprintf(s_battery_text, sizeof(s_battery_text), "%d%%", state.charge_percent);
   text_layer_set_text(s_battery_layer, s_battery_text);
   text_layer_set_text_color(s_battery_layer, color_for_battery(state.charge_percent));
@@ -59,10 +80,39 @@ static void update_bt(bool connected) {
   text_layer_set_text_color(s_bt_layer, connected ? GColorGreen : GColorRed);
 }
 
+static void label_at_index(int index, char *buffer, size_t buffer_size) {
+  buffer[0] = '\0';
+  if (buffer_size == 0 || index < 0) {
+    return;
+  }
+
+  int current = 0;
+  size_t out = 0;
+  for (size_t i = 0; s_labels[i] != '\0'; i++) {
+    char ch = s_labels[i];
+    if (ch == '|') {
+      if (current == index) {
+        break;
+      }
+      current++;
+      out = 0;
+      buffer[0] = '\0';
+      continue;
+    }
+    if (current == index && out + 1 < buffer_size) {
+      buffer[out++] = ch;
+      buffer[out] = '\0';
+    }
+  }
+}
+
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time();
-  if (s_bt_connected && strlen(s_status_line) == 0 &&
-      time(NULL) - s_last_request_at >= REQUEST_RETRY_SECONDS) {
+  int count = status_count();
+  if (count > 0) {
+    s_selected_index = (s_selected_index + 1) % count;
+    layer_mark_dirty(s_status_layer);
+  } else if (s_bt_connected && time(NULL) - s_last_request_at >= REQUEST_RETRY_SECONDS) {
     request_phone_update();
   }
 }
@@ -78,69 +128,87 @@ static void bt_handler(bool connected) {
   }
 }
 
+static void draw_empty_state(GContext *ctx, GRect bounds) {
+  const char *text = s_bt_connected ? (s_phone_pending ? "PHONE?" : "WAIT") : "NO BT";
+  graphics_context_set_text_color(ctx, s_bt_connected ? GColorYellow : GColorRed);
+  graphics_draw_text(ctx, text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
+                     bounds, GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
+}
+
 static void status_layer_update(Layer *layer, GContext *ctx) {
   GRect bounds = layer_get_bounds(layer);
-  graphics_context_set_text_color(ctx, GColorWhite);
-
-  int len = strlen(s_status_line);
-  if (len == 0) {
-    const char *text = s_bt_connected ? (s_phone_pending ? "PHONE?" : "WAIT") : "NO BT";
-    graphics_context_set_text_color(ctx, s_bt_connected ? GColorYellow : GColorRed);
-    graphics_draw_text(ctx, text, fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
-                       bounds, GTextOverflowModeWordWrap, GTextAlignmentCenter, NULL);
+  int count = status_count();
+  if (count <= 0) {
+    if (s_has_payload) {
+      return;
+    }
+    draw_empty_state(ctx, bounds);
     return;
   }
 
-  int marker_width = 22;
-  int marker_height = 24;
-  int columns = bounds.size.w / marker_width;
-  if (columns < 1) {
-    columns = 1;
-  }
-  if (columns > MAX_STATUS_MARKERS) {
-    columns = MAX_STATUS_MARKERS;
+  if (s_selected_index >= count) {
+    s_selected_index = 0;
   }
 
-  int rows = (len + columns - 1) / columns;
-  int y = (bounds.size.h - rows * marker_height) / 2;
-  if (y < 0) {
-    y = 0;
+  const int gap = 1;
+  const int bar_height = 22;
+  const int bar_y = 4;
+  const int full_width = bounds.size.w;
+  int segment_width = (full_width - gap * (count - 1)) / count;
+  if (segment_width < 2) {
+    segment_width = 2;
   }
 
-  for (int row = 0; row < rows; row++) {
-    int row_start = row * columns;
-    int row_count = len - row_start;
-    if (row_count > columns) {
-      row_count = columns;
-    }
-    int row_width = row_count * marker_width;
-    int x = (bounds.size.w - row_width) / 2;
-    if (x < 0) {
-      x = 0;
-    }
-
-    for (int col = 0; col < row_count; col++) {
-      char marker[4];
-      marker[0] = '[';
-      marker[1] = s_status_line[row_start + col];
-      marker[2] = ']';
-      marker[3] = '\0';
-
-      graphics_context_set_text_color(ctx, color_for_status(marker[1]));
-      graphics_draw_text(ctx, marker, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
-                         GRect(x + col * marker_width, y + row * marker_height, marker_width, marker_height),
-                         GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-    }
+  for (int i = 0; i < count; i++) {
+    int x = i * (segment_width + gap);
+    int width = (i == count - 1) ? full_width - x : segment_width;
+    graphics_context_set_fill_color(ctx, color_for_status(s_status_line[i]));
+    graphics_fill_rect(ctx, GRect(x, bar_y, width, bar_height), 0, GCornerNone);
   }
+
+  int selected_x = s_selected_index * (segment_width + gap);
+  int selected_width = (s_selected_index == count - 1) ? full_width - selected_x : segment_width;
+  int cx = selected_x + selected_width / 2;
+  int arrow_y = bar_y + bar_height + 4;
+  graphics_context_set_fill_color(ctx, GColorWhite);
+  gpath_move_to(s_arrow_path, GPoint(cx, arrow_y));
+  gpath_draw_filled(ctx, s_arrow_path);
+
+  char label[MAX_LABEL_CHARS];
+  label_at_index(s_selected_index, label, sizeof(label));
+  if (label[0] == '\0') {
+    snprintf(label, sizeof(label), "[%d/%d]", s_selected_index + 1, count);
+  }
+
+  graphics_context_set_text_color(ctx, GColorWhite);
+  graphics_draw_text(ctx, label, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
+                     GRect(2, arrow_y + 13, bounds.size.w - 4, 38),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
 static void inbox_received(DictionaryIterator *iter, void *context) {
   Tuple *statuses = dict_find(iter, MESSAGE_KEY_statuses);
+  Tuple *labels = dict_find(iter, MESSAGE_KEY_labels);
+
   if (statuses && statuses->type == TUPLE_CSTRING) {
     strncpy(s_status_line, statuses->value->cstring, sizeof(s_status_line) - 1);
     s_status_line[sizeof(s_status_line) - 1] = '\0';
-    s_phone_pending = false;
+    s_has_payload = true;
     persist_write_string(PERSIST_STATUS_LINE, s_status_line);
+    persist_write_bool(PERSIST_HAS_PAYLOAD, true);
+    if (s_selected_index >= status_count()) {
+      s_selected_index = 0;
+    }
+  }
+
+  if (labels && labels->type == TUPLE_CSTRING) {
+    strncpy(s_labels, labels->value->cstring, sizeof(s_labels) - 1);
+    s_labels[sizeof(s_labels) - 1] = '\0';
+    persist_write_string(PERSIST_LABELS, s_labels);
+  }
+
+  if (statuses || labels) {
+    s_phone_pending = false;
     layer_mark_dirty(s_status_layer);
   }
 }
@@ -186,27 +254,33 @@ static void window_load(Window *window) {
   Layer *root = window_get_root_layer(window);
   GRect bounds = layer_get_bounds(root);
 
-  s_time_layer = create_text_layer(GRect(0, 12, bounds.size.w, 42),
+  s_time_layer = create_text_layer(GRect(0, 10, bounds.size.w, 46),
                                    fonts_get_system_font(FONT_KEY_BITHAM_42_BOLD),
                                    GTextAlignmentCenter);
   layer_add_child(root, text_layer_get_layer(s_time_layer));
 
-  s_battery_layer = create_text_layer(GRect(18, 58, 54, 24),
-                                      fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
+  s_battery_layer = create_text_layer(GRect(12, 58, 56, 22),
+                                      fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
                                       GTextAlignmentLeft);
   layer_add_child(root, text_layer_get_layer(s_battery_layer));
 
-  s_bt_layer = create_text_layer(GRect(bounds.size.w - 50, 58, 32, 24),
-                                 fonts_get_system_font(FONT_KEY_GOTHIC_24_BOLD),
+  s_bt_layer = create_text_layer(GRect(bounds.size.w - 44, 58, 32, 22),
+                                 fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
                                  GTextAlignmentRight);
   layer_add_child(root, text_layer_get_layer(s_bt_layer));
 
-  s_status_layer = layer_create(GRect(0, 86, bounds.size.w, bounds.size.h - 90));
+  s_status_layer = layer_create(GRect(0, 84, bounds.size.w, bounds.size.h - 86));
   layer_set_update_proc(s_status_layer, status_layer_update);
   layer_add_child(root, s_status_layer);
 
   if (persist_exists(PERSIST_STATUS_LINE)) {
     persist_read_string(PERSIST_STATUS_LINE, s_status_line, sizeof(s_status_line));
+  }
+  if (persist_exists(PERSIST_LABELS)) {
+    persist_read_string(PERSIST_LABELS, s_labels, sizeof(s_labels));
+  }
+  if (persist_exists(PERSIST_HAS_PAYLOAD)) {
+    s_has_payload = persist_read_bool(PERSIST_HAS_PAYLOAD);
   }
 
   update_time();
@@ -224,6 +298,7 @@ static void window_unload(Window *window) {
 
 static void init(void) {
   s_window = window_create();
+  s_arrow_path = gpath_create(&ARROW_PATH_INFO);
   window_set_background_color(s_window, GColorBlack);
   window_set_window_handlers(s_window, (WindowHandlers) {
     .load = window_load,
@@ -234,9 +309,9 @@ static void init(void) {
   app_message_register_inbox_dropped(inbox_dropped);
   app_message_register_outbox_sent(outbox_sent);
   app_message_register_outbox_failed(outbox_failed);
-  app_message_open(256, 64);
+  app_message_open(1024, 64);
 
-  tick_timer_service_subscribe(MINUTE_UNIT, tick_handler);
+  tick_timer_service_subscribe(SECOND_UNIT, tick_handler);
   battery_state_service_subscribe(battery_handler);
   connection_service_subscribe((ConnectionHandlers) {
     .pebble_app_connection_handler = bt_handler
@@ -250,6 +325,7 @@ static void deinit(void) {
   tick_timer_service_unsubscribe();
   battery_state_service_unsubscribe();
   connection_service_unsubscribe();
+  gpath_destroy(s_arrow_path);
   window_destroy(s_window);
 }
 
