@@ -2,6 +2,7 @@
 /build/
 /app/build/
 /watchapp/build/
+/watchapp/.lock-waf_*
 local.properties
 *.iml
 .idea/
