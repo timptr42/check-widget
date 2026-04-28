@@ -9,6 +9,7 @@
 #define MAX_LABEL_CHARS 40
 #define REQUEST_RETRY_SECONDS 30
 #define MESSAGE_KEY_labels 4
+#define ALL_GREEN_TEXT "all test services available"
 
 static Window *s_window;
 static TextLayer *s_time_layer;
@@ -24,16 +25,6 @@ static time_t s_last_request_at;
 static bool s_phone_pending;
 static bool s_has_payload;
 static int s_selected_index;
-static GPath *s_arrow_path;
-static const GPoint ARROW_POINTS[] = {
-    {0, 0},
-    {-7, 10},
-    {7, 10}
-};
-static const GPathInfo ARROW_PATH_INFO = {
-    .num_points = 3,
-    .points = (GPoint *)ARROW_POINTS
-};
 
 static void request_phone_update(void);
 
@@ -59,6 +50,34 @@ static GColor color_for_battery(int percent) {
 
 static int status_count(void) {
   return strlen(s_status_line);
+}
+
+static bool is_problem_status(char status) {
+  return status == 'X' || status == '!';
+}
+
+static bool has_problem_status(void) {
+  int count = status_count();
+  for (int i = 0; i < count; i++) {
+    if (is_problem_status(s_status_line[i])) {
+      return true;
+    }
+  }
+  return false;
+}
+
+static int next_problem_index(int from_index) {
+  int count = status_count();
+  if (count <= 0) {
+    return 0;
+  }
+  for (int step = 1; step <= count; step++) {
+    int candidate = (from_index + step) % count;
+    if (is_problem_status(s_status_line[candidate])) {
+      return candidate;
+    }
+  }
+  return 0;
 }
 
 static void update_time(void) {
@@ -109,8 +128,8 @@ static void label_at_index(int index, char *buffer, size_t buffer_size) {
 static void tick_handler(struct tm *tick_time, TimeUnits units_changed) {
   update_time();
   int count = status_count();
-  if (count > 0) {
-    s_selected_index = (s_selected_index + 1) % count;
+  if (count > 0 && has_problem_status()) {
+    s_selected_index = next_problem_index(s_selected_index);
     layer_mark_dirty(s_status_layer);
   } else if (s_bt_connected && time(NULL) - s_last_request_at >= REQUEST_RETRY_SECONDS) {
     request_phone_update();
@@ -146,18 +165,34 @@ static void status_layer_update(Layer *layer, GContext *ctx) {
     return;
   }
 
-  if (s_selected_index >= count) {
-    s_selected_index = 0;
+  bool has_problems = has_problem_status();
+  if (has_problems && (s_selected_index >= count || !is_problem_status(s_status_line[s_selected_index]))) {
+    s_selected_index = next_problem_index(count - 1);
   }
 
   const int gap = 1;
-  const int bar_height = 22;
-  const int bar_y = 4;
+  const int bar_height = 18;
+  const int bar_y = bounds.size.h - bar_height - 2;
   const int full_width = bounds.size.w;
   int segment_width = (full_width - gap * (count - 1)) / count;
   if (segment_width < 2) {
     segment_width = 2;
   }
+
+  char label[MAX_LABEL_CHARS];
+  if (has_problems) {
+    label_at_index(s_selected_index, label, sizeof(label));
+    if (label[0] == '\0') {
+      snprintf(label, sizeof(label), "[%d/%d]", s_selected_index + 1, count);
+    }
+  } else {
+    snprintf(label, sizeof(label), "%s", ALL_GREEN_TEXT);
+  }
+
+  graphics_context_set_text_color(ctx, has_problems ? GColorWhite : GColorGreen);
+  graphics_draw_text(ctx, label, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
+                     GRect(2, 0, bounds.size.w - 4, bar_y - 2),
+                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 
   for (int i = 0; i < count; i++) {
     int x = i * (segment_width + gap);
@@ -166,24 +201,17 @@ static void status_layer_update(Layer *layer, GContext *ctx) {
     graphics_fill_rect(ctx, GRect(x, bar_y, width, bar_height), 0, GCornerNone);
   }
 
-  int selected_x = s_selected_index * (segment_width + gap);
-  int selected_width = (s_selected_index == count - 1) ? full_width - selected_x : segment_width;
-  int cx = selected_x + selected_width / 2;
-  int arrow_y = bar_y + bar_height + 4;
-  graphics_context_set_fill_color(ctx, GColorWhite);
-  gpath_move_to(s_arrow_path, GPoint(cx, arrow_y));
-  gpath_draw_filled(ctx, s_arrow_path);
-
-  char label[MAX_LABEL_CHARS];
-  label_at_index(s_selected_index, label, sizeof(label));
-  if (label[0] == '\0') {
-    snprintf(label, sizeof(label), "[%d/%d]", s_selected_index + 1, count);
+  if (has_problems) {
+    int selected_x = s_selected_index * (segment_width + gap);
+    int selected_width = (s_selected_index == count - 1) ? full_width - selected_x : segment_width;
+    GRect frame = GRect(selected_x, bar_y, selected_width, bar_height);
+    graphics_context_set_stroke_color(ctx, GColorBlack);
+    graphics_context_set_stroke_width(ctx, 4);
+    graphics_draw_rect(ctx, frame);
+    graphics_context_set_stroke_color(ctx, GColorWhite);
+    graphics_context_set_stroke_width(ctx, 1);
+    graphics_draw_rect(ctx, grect_inset(frame, GEdgeInsets(2)));
   }
-
-  graphics_context_set_text_color(ctx, GColorWhite);
-  graphics_draw_text(ctx, label, fonts_get_system_font(FONT_KEY_GOTHIC_18_BOLD),
-                     GRect(2, arrow_y + 13, bounds.size.w - 4, 38),
-                     GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
 }
 
 static void inbox_received(DictionaryIterator *iter, void *context) {
@@ -196,8 +224,8 @@ static void inbox_received(DictionaryIterator *iter, void *context) {
     s_has_payload = true;
     persist_write_string(PERSIST_STATUS_LINE, s_status_line);
     persist_write_bool(PERSIST_HAS_PAYLOAD, true);
-    if (s_selected_index >= status_count()) {
-      s_selected_index = 0;
+    if (status_count() > 0) {
+      s_selected_index = has_problem_status() ? next_problem_index(status_count() - 1) : 0;
     }
   }
 
@@ -269,7 +297,7 @@ static void window_load(Window *window) {
                                  GTextAlignmentRight);
   layer_add_child(root, text_layer_get_layer(s_bt_layer));
 
-  s_status_layer = layer_create(GRect(0, 84, bounds.size.w, bounds.size.h - 86));
+  s_status_layer = layer_create(GRect(0, 82, bounds.size.w, bounds.size.h - 84));
   layer_set_update_proc(s_status_layer, status_layer_update);
   layer_add_child(root, s_status_layer);
 
@@ -298,7 +326,6 @@ static void window_unload(Window *window) {
 
 static void init(void) {
   s_window = window_create();
-  s_arrow_path = gpath_create(&ARROW_PATH_INFO);
   window_set_background_color(s_window, GColorBlack);
   window_set_window_handlers(s_window, (WindowHandlers) {
     .load = window_load,
@@ -325,7 +352,6 @@ static void deinit(void) {
   tick_timer_service_unsubscribe();
   battery_state_service_unsubscribe();
   connection_service_unsubscribe();
-  gpath_destroy(s_arrow_path);
   window_destroy(s_window);
 }
 

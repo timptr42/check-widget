@@ -25,11 +25,11 @@ export ANDROID_HOME="$HOME/android-sdk"
 
 Готовый APK появляется в:
 
-`app/build/outputs/apk/debug/check-widget-debug-build-6.apk`
+`app/build/outputs/apk/debug/check-widget-debug-build-7.apk`
 
 Версия, добавленная в git:
 
-`dist/check-widget-debug-build-6.apk`
+`dist/check-widget-debug-build-7.apk`
 
 Package name: `ru.timptr.statuswidget`.
 
@@ -46,9 +46,9 @@ pebble build
 
 Готовый PBW:
 
-`dist/timptr-check-watchface-build-6.pbw`
+`dist/timptr-check-watchface-build-7.pbw`
 
-Watchface показывает крупное время `HH MM`, батарею часов цветом, `BT` цветом и графическую статусную полосу во всю ширину экрана. Полоса разделена на блоки по количеству индикаторов, блоки окрашены в green/yellow/red. Каждую секунду стрелка под полосой переходит к следующему блоку, а подпись под стрелкой показывает текущий индикатор в формате `[source - indicator]`.
+Watchface показывает крупное время `HH MM`, батарею часов цветом, `BT` цветом и графическую статусную полосу внизу экрана. Полоса разделена на блоки по количеству индикаторов, блоки окрашены в green/yellow/red. Если есть yellow/red, толстая черная рамка раз в секунду переключается только между проблемными блоками, а текст над полосой показывает текущий индикатор в формате `[source - indicator]`. Если все блоки green, рамка не отображается, а текст сообщает, что все тестовые сервисы доступны.
 
 Если сервер вернул пустой список индикаторов, Android отправляет пустое состояние, а watchface скрывает полосу, стрелку и подпись.
 

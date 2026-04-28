@@ -15,6 +15,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -68,16 +69,14 @@ final class StatusRepository {
         if (epochMillis <= 0L) {
             return context.getString(R.string.never);
         }
-        DateFormat formatter = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM, Locale.getDefault());
-        return formatter.format(new Date(epochMillis));
+        return "[" + formatAge(epochMillis) + "] " + formatAbsolute(epochMillis);
     }
 
     static String formatMillis(long epochMillis) {
         if (epochMillis <= 0L) {
             return "";
         }
-        DateFormat formatter = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.MEDIUM, Locale.getDefault());
-        return formatter.format(new Date(epochMillis));
+        return "[" + formatAge(epochMillis) + "] " + formatAbsolute(epochMillis);
     }
 
     static String formatIso(String value) {
@@ -94,6 +93,26 @@ final class StatusRepository {
     static String formatIso(Context context, String value) {
         String formatted = formatIso(value);
         return formatted.isEmpty() ? context.getString(R.string.never) : formatted;
+    }
+
+    private static String formatAbsolute(long epochMillis) {
+        return new SimpleDateFormat("dd.MM HH:mm", Locale.getDefault()).format(new Date(epochMillis));
+    }
+
+    private static String formatAge(long epochMillis) {
+        long diffSeconds = Math.max(0L, (System.currentTimeMillis() - epochMillis) / 1000L);
+        if (diffSeconds < 60L) {
+            return diffSeconds + "сек";
+        }
+        long diffMinutes = diffSeconds / 60L;
+        if (diffMinutes < 60L) {
+            return diffMinutes + "мин";
+        }
+        long diffHours = diffMinutes / 60L;
+        if (diffHours < 24L) {
+            return diffHours + "ч";
+        }
+        return (diffHours / 24L) + "д";
     }
 
     private static String fetchJson() throws IOException {
